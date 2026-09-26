@@ -5,3 +5,10 @@ __MACOSX/
 __pycache__/
 *.pyc
 
+student_resource/output/*.tsv
+student_resource/output/parts/
+student_resource/zip_stage/
+student_resource/*.zip
+*.zip
+student_resource/code/business_entity_resolution/model.joblib.threshold
+

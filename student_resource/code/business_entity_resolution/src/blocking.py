@@ -70,8 +70,8 @@ def block_country(s1_ids, s1_texts, c_ids, c_texts, top_k, batch_size):
       postings of rare ngrams (10-20x faster, still typo-robust for char ngrams).
     - Per shard-batch keep top-K per row (numpy), merge across shards.
     """
-    C_SHARD = 400000
-    FIT_SAMPLE = 200000
+    C_SHARD = 500000
+    FIT_SAMPLE = 150000
     keep = getattr(config, "Q_RARE_KEEP", 25)
     vec = _build_vectorizer()
     if len(c_texts) > FIT_SAMPLE:

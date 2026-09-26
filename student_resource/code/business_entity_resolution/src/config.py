@@ -23,18 +23,18 @@ OUTPUT_DIR = os.path.join(os.getcwd(), "output")
 
 # Blocking params
 TOP_K = 20  # candidates per S1 per side? Actually total top-K across S2+S3
-BATCH_SIZE = 5000  # S1 queries per batch for TF-IDF blocking
+BATCH_SIZE = 10000  # S1 queries per batch for TF-IDF blocking
 TFIDF_NGRAM = (1, 2)
 TFIDF_ANALYZER = "word"
 TFIDF_MIN_DF = 2
-TFIDF_MAX_FEATURES = 50000
-TFIDF_MAX_DF = 0.2  # drop overly common tokens to sparsify
-Q_RARE_KEEP = 10  # keep top-N rarest ngrams per query for speed
+TFIDF_MAX_FEATURES = 40000
+TFIDF_MAX_DF = 0.1  # drop overly common tokens to sparsify
+Q_RARE_KEEP = 6  # keep top-N rarest ngrams per query for speed
 
 # Training params
 VAL_FRACTION = 0.2
 RANDOM_STATE = 42
-MAX_TRAIN_S1 = 150000  # cap to keep training tractable (stratified sample)
+MAX_TRAIN_S1 = 60000  # cap to keep training tractable (stratified sample)
 MODEL_PATH = os.path.join(os.getcwd(), "code", "business_entity_resolution", "model.joblib")
 
 # Inference
