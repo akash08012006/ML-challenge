@@ -21,8 +21,10 @@ TEST_DIR = os.path.join(DATASET_DIR, "test")
 
 OUTPUT_DIR = os.path.join(os.getcwd(), "output")
 
-# Blocking params
-TOP_K = 20  # candidates per S1 per side? Actually total top-K across S2+S3
+# Blocking params (hybrid name + address streams)
+TOP_K = 20  # fallback single-stream cap
+NAME_K = 18  # name-stream top-K per S1
+ADDR_K = 14  # address-stream top-K per S1 (catches transliteration/DBA)
 BATCH_SIZE = 10000  # S1 queries per batch for TF-IDF blocking
 TFIDF_NGRAM = (1, 2)
 TFIDF_ANALYZER = "word"
@@ -34,7 +36,7 @@ Q_RARE_KEEP = 6  # keep top-N rarest ngrams per query for speed
 # Training params
 VAL_FRACTION = 0.2
 RANDOM_STATE = 42
-MAX_TRAIN_S1 = 60000  # cap to keep training tractable (stratified sample)
+MAX_TRAIN_S1 = 24000  # hybrid 2-stream blocking is 2x cost; smaller sample still ~800k pairs
 MODEL_PATH = os.path.join(os.getcwd(), "code", "business_entity_resolution", "model.joblib")
 
 # Inference

@@ -70,8 +70,8 @@ def block_country(s1_ids, s1_texts, c_ids, c_texts, top_k, batch_size):
       postings of rare ngrams (10-20x faster, still typo-robust for char ngrams).
     - Per shard-batch keep top-K per row (numpy), merge across shards.
     """
-    C_SHARD = 500000
-    FIT_SAMPLE = 150000
+    C_SHARD = 1000000
+    FIT_SAMPLE = 100000
     keep = getattr(config, "Q_RARE_KEEP", 25)
     vec = _build_vectorizer()
     if len(c_texts) > FIT_SAMPLE:
@@ -164,6 +164,8 @@ def block_all(s1_df, s23_df, top_k=None, batch_size=None):
     cos_map = {}
 
     countries = set(s1_df["_cc"].unique().tolist()) | set(s23_df["_cc"].unique().tolist())
+    name_k = getattr(config, "NAME_K", top_k)
+    addr_k = getattr(config, "ADDR_K", top_k)
     for cc in countries:
         sub1 = s1_df[s1_df["_cc"] == cc]
         sub23 = s23_df[s23_df["_cc"] == cc]
@@ -172,9 +174,11 @@ def block_all(s1_df, s23_df, top_k=None, batch_size=None):
                 candidates[str(sid)] = []
             continue
         s1_ids = sub1["entity_id"].astype(str).tolist()
-        s1_texts = sub1["_bt"].tolist()
         c_ids = sub23["entity_id"].astype(str).tolist()
-        c_texts = sub23["_bt"].tolist()
+        s1_names = sub1["_nn"].tolist()
+        c_names = sub23["_nn"].tolist()
+        s1_addrs = sub1["_na"].tolist()
+        c_addrs = sub23["_na"].tolist()
 
         # exact-name index for this country
         exact = defaultdict(list)
@@ -182,29 +186,40 @@ def block_all(s1_df, s23_df, top_k=None, batch_size=None):
             if nn:
                 exact[nn].append(str(cid))
 
-        blk, sc = block_country(s1_ids, s1_texts, c_ids, c_texts, top_k, batch_size)
-        # merge exact matches (put first, then TF-IDF rest, dedupe, cap at top_k + exact extras)
+        # Stream 1: name-only TF-IDF (catches word-order/abbr/typo-light matches)
+        blk_n, sc_n = block_country(s1_ids, s1_names, c_ids, c_names, name_k, batch_size)
+        # Stream 2: address-only TF-IDF (catches transliteration + DBA same-address)
+        blk_a, sc_a = block_country(s1_ids, s1_addrs, c_ids, c_addrs, addr_k, batch_size)
+        # merge exact + name + address (dedupe, name-first ordering)
         s1_nn = dict(zip(s1_ids, sub1["_nn"].tolist()))
         for sid in s1_ids:
             ex = exact.get(s1_nn.get(sid, ""), [])
-            tfidf_ids = [cid for cid, _ in blk.get(sid, [])]
+            n_ids = [cid for cid, _ in blk_n.get(sid, [])]
+            a_ids = [cid for cid, _ in blk_a.get(sid, [])]
             merged = []
             seen = set()
-            for cid in ex + tfidf_ids:
+            for cid in ex + n_ids + a_ids:
                 if cid not in seen:
                     seen.add(cid)
                     merged.append(cid)
-            # cap: allow exact extras beyond top_k but cap total at top_k + 10 to bound inference
-            cap = top_k + 10
+            cap = name_k + addr_k + 10
             merged = merged[:cap]
             candidates[sid] = merged
-            for cid, s in blk.get(sid, []):
+            for cid, s in blk_n.get(sid, []):
                 cos_map[(sid, cid)] = s
+            for cid, s in blk_a.get(sid, []):
+                # keep max cosine across streams; address cosine on different scale
+                # store with 0.9 weight so name matches rank slightly higher in features
+                w = float(s) * 0.9
+                if (sid, cid) not in cos_map or w > cos_map[(sid, cid)]:
+                    # don't overwrite a strong name score with weaker addr score
+                    if (sid, cid) not in cos_map:
+                        cos_map[(sid, cid)] = w
             for cid in ex:
                 if (sid, cid) not in cos_map:
                     cos_map[(sid, cid)] = 1.0
         # free memory
-        del blk, sc
+        del blk_n, sc_n, blk_a, sc_a
     # ensure every S1 present
     for sid in s1_df["entity_id"].astype(str).tolist():
         candidates.setdefault(sid, [])
